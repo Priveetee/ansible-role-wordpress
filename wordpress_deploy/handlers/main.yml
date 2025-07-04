@@ -1,0 +1,16 @@
+---
+- name: restart php-fpm rocky
+  ansible.builtin.shell: |
+    supervisorctl restart php-fpm
+  listen: "restart php-fpm rocky"
+
+- name: restart apache rocky
+  ansible.builtin.shell: |
+    supervisorctl restart httpd
+  listen: "restart apache rocky"
+
+- name: restart apache ubuntu
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
+  listen: "restart apache ubuntu"

@@ -1,0 +1,5 @@
+---
+- name: Test the wordpress_deploy role
+  hosts: wordpress_servers
+  roles:
+    - wordpress_deploy

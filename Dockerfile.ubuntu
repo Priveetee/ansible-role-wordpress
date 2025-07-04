@@ -1,0 +1,8 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y openssh-server sudo python3
+RUN echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+RUN mkdir -p /run/sshd
+COPY .ssh/authorized_keys /root/.ssh/authorized_keys
+RUN chmod 600 /root/.ssh/authorized_keys && chown root:root /root/.ssh/authorized_keys
+CMD ["/usr/sbin/sshd", "-D"]

@@ -1,0 +1,7 @@
+[wordpress]
+wordpress-ubuntu ansible_host=localhost ansible_port=2281 ansible_user=root
+wordpress-rocky ansible_host=localhost ansible_port=2282 ansible_user=root
+
+[wordpress:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'

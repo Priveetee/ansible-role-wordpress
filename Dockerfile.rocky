@@ -1,0 +1,30 @@
+FROM rockylinux:9
+
+# Installation des paquets de base et EPEL
+RUN dnf update -y && dnf install -y \
+    openssh-server \
+    sudo \
+    python3 \
+    epel-release \
+    && dnf install -y supervisor \
+    && ssh-keygen -A
+
+# Configuration SSH
+RUN sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed -i 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' /etc/pam.d/sshd
+
+# Copie des clés SSH
+COPY .ssh/authorized_keys /root/.ssh/authorized_keys
+RUN chmod 600 /root/.ssh/authorized_keys && chown root:root /root/.ssh/authorized_keys
+
+# Configuration de supervisord
+COPY supervisord.conf /etc/supervisord.conf
+
+# Création des répertoires nécessaires
+RUN mkdir -p /var/log/supervisor /run/php-fpm
+
+# Exposition des ports
+EXPOSE 22 80
+
+# Démarrage de supervisord
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf", "-n"]

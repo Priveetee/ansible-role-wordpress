@@ -1,0 +1,201 @@
+---
+- name: Update package cache (Debian)
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+
+- name: Update package cache (RedHat)
+  ansible.builtin.dnf:
+    update_cache: yes
+  when: ansible_os_family == 'RedHat'
+
+- name: Install debconf-utils for Ubuntu
+  ansible.builtin.package:
+    name: debconf-utils
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Pre-configure MariaDB root password (Ubuntu)
+  ansible.builtin.debconf:
+    name: mariadb-server
+    question: "{{ item }}"
+    value: "{{ mysql_root_password }}"
+    vtype: password
+  loop:
+    - mariadb-server/root_password
+    - mariadb-server/root_password_again
+  when: ansible_os_family == 'Debian'
+
+- name: Install Apache package
+  ansible.builtin.package:
+    name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+    state: present
+
+- name: Install PHP packages
+  ansible.builtin.package:
+    name: "{{ php_packages_debian if ansible_os_family == 'Debian' else php_packages_redhat }}"
+    state: present
+
+- name: Install MySQL packages
+  ansible.builtin.package:
+    name: "{{ mysql_packages_debian if ansible_os_family == 'Debian' else mysql_packages_redhat }}"
+    state: present
+
+- name: Install additional packages (Ubuntu)
+  ansible.builtin.package:
+    name:
+      - wget
+      - unzip
+      - curl
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install additional packages (Rocky)
+  ansible.builtin.package:
+    name:
+      - wget
+      - unzip
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Initialize MariaDB data directory (Rocky Linux)
+  ansible.builtin.shell: |
+    if [ ! -d /var/lib/mysql/mysql ]; then
+      mysql_install_db --user=mysql --datadir=/var/lib/mysql
+    fi
+  when: ansible_os_family == 'RedHat'
+
+- name: Set correct permissions for MariaDB data directory (Rocky Linux)
+  ansible.builtin.file:
+    path: /var/lib/mysql
+    owner: mysql
+    group: mysql
+    mode: '0755'
+    recurse: yes
+  when: ansible_os_family == 'RedHat'
+
+- name: Remove default Apache index file
+  ansible.builtin.file:
+    path: /var/www/html/index.html
+    state: absent
+
+- name: Start Apache service (Ubuntu)
+  ansible.builtin.shell: service apache2 start
+  when: ansible_os_family == 'Debian'
+  async: 10
+  poll: 0
+
+- name: Start Apache service (Rocky)
+  ansible.builtin.shell: /usr/sbin/httpd -DFOREGROUND &
+  when: ansible_os_family == 'RedHat'
+  async: 10
+  poll: 0
+
+- name: Start MariaDB service (Ubuntu)
+  ansible.builtin.shell: mysqld_safe --datadir=/var/lib/mysql &
+  when: ansible_os_family == 'Debian'
+  async: 10
+  poll: 0
+
+- name: Start MariaDB service (Rocky Linux)
+  ansible.builtin.shell: |
+    pkill -f mysqld || true
+    sleep 2
+    mysqld_safe --user=mysql --datadir=/var/lib/mysql &
+  when: ansible_os_family == 'RedHat'
+  async: 10
+  poll: 0
+
+- name: Wait for MariaDB to be ready
+  ansible.builtin.wait_for:
+    port: 3306
+    host: localhost
+    timeout: 90
+    delay: 5
+
+- name: Create MariaDB configuration file for root user
+  ansible.builtin.template:
+    src: my.cnf.j2
+    dest: /root/.my.cnf
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Secure MariaDB installation
+  ansible.builtin.shell: |
+    mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_root_password }}';" || true
+    mysql -uroot -p{{ mysql_root_password }} -e "DELETE FROM mysql.user WHERE User='';" || true
+    mysql -uroot -p{{ mysql_root_password }} -e "DROP DATABASE IF EXISTS test;" || true
+    mysql -uroot -p{{ mysql_root_password }} -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';" || true
+    mysql -uroot -p{{ mysql_root_password }} -e "FLUSH PRIVILEGES;" || true
+
+- name: Create WordPress database
+  community.mysql.mysql_db:
+    name: "{{ wordpress_db_name }}"
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+
+- name: Create WordPress database user
+  community.mysql.mysql_user:
+    name: "{{ wordpress_db_user }}"
+    password: "{{ wordpress_db_password }}"
+    priv: "{{ wordpress_db_name }}.*:ALL"
+    host: localhost
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+
+- name: Download WordPress
+  ansible.builtin.get_url:
+    url: "https://wordpress.org/latest.zip"
+    dest: /tmp/wordpress.zip
+    mode: '0644'
+
+- name: Extract WordPress
+  ansible.builtin.unarchive:
+    src: /tmp/wordpress.zip
+    dest: /tmp/
+    remote_src: yes
+    creates: /tmp/wordpress
+
+- name: Copy WordPress files
+  ansible.builtin.copy:
+    src: /tmp/wordpress/
+    dest: /var/www/html/
+    remote_src: yes
+    owner: "{{ 'www-data' if ansible_os_family == 'Debian' else 'apache' }}"
+    group: "{{ 'www-data' if ansible_os_family == 'Debian' else 'apache' }}"
+    mode: '0755'
+
+- name: Create WordPress configuration file
+  ansible.builtin.template:
+    src: wp-config.php.j2
+    dest: /var/www/html/wp-config.php
+    owner: "{{ 'www-data' if ansible_os_family == 'Debian' else 'apache' }}"
+    group: "{{ 'www-data' if ansible_os_family == 'Debian' else 'apache' }}"
+    mode: '0640'
+
+- name: Clean up temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/wordpress.zip
+    - /tmp/wordpress
+
+- name: Ensure Apache is running (Ubuntu)
+  ansible.builtin.shell: service apache2 reload
+  when: ansible_os_family == 'Debian'
+  async: 5
+  poll: 0
+
+- name: Ensure Apache is running (Rocky)
+  ansible.builtin.shell: |
+    pkill -f httpd || true
+    sleep 2
+    /usr/sbin/httpd -DFOREGROUND &
+  when: ansible_os_family == 'RedHat'
+  async: 5
+  poll: 0

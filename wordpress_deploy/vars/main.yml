@@ -1,0 +1,34 @@
+---
+# Packages PHP pour Rocky Linux
+php_packages_redhat:
+  - php
+  - php-fpm
+  - php-mysqlnd
+  - php-json
+  - php-xml
+  - php-gd
+  - php-mbstring
+  - php-curl
+  - php-zip
+
+# Packages MySQL pour Rocky Linux
+mysql_packages_redhat:
+  - mariadb-server
+  - mariadb
+
+# Packages pour Ubuntu
+php_packages_debian:
+  - apache2
+  - libapache2-mod-php
+  - php
+  - php-mysql
+  - php-json
+  - php-xml
+  - php-gd
+  - php-mbstring
+  - php-curl
+  - php-zip
+
+mysql_packages_debian:
+  - mariadb-server
+  - mariadb-client

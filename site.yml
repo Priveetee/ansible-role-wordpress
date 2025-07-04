@@ -1,0 +1,46 @@
+---
+- name: Deploy WordPress
+  hosts: wordpress
+  become: true
+  gather_facts: true
+  
+  pre_tasks:
+    - name: Wait for SSH to be available
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: Install Python MySQL library (Debian)
+      ansible.builtin.package:
+        name: python3-pymysql
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install Python MySQL library (RedHat)
+      ansible.builtin.package:
+        name: python3-PyMySQL
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+  roles:
+    - wordpress_deploy
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          WordPress installation completed successfully!
+          
+          Access your WordPress sites:
+          - Ubuntu: http://localhost:8081
+          - Rocky: http://localhost:8082
+          
+          Database Details:
+          - Database Name: {{ wordpress_db_name }}
+          - Database User: {{ wordpress_db_user }}
+          - Database Password: {{ wordpress_db_password }}
+          - Database Host: localhost
+          
+          Next Steps:
+          1. Open your web browser
+          2. Navigate to the URL above
+          3. Complete the WordPress installation wizard

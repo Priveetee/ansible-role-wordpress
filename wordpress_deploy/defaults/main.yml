@@ -1,0 +1,9 @@
+---
+# Configuration WordPress
+wordpress_db_name: wordpress
+wordpress_db_user: wpuser
+wordpress_db_password: localhost123
+wordpress_table_prefix: wp_
+
+# Configuration MySQL
+mysql_root_password: examplerootPW

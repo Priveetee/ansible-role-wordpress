@@ -1,0 +1,26 @@
+services:
+  wordpress-ubuntu:
+    build:
+      context: .
+      dockerfile: Dockerfile.ubuntu
+    container_name: wordpress-ubuntu
+    hostname: wordpress-ubuntu
+    privileged: true
+    ports:
+      - "8081:80"
+      - "2281:22" 
+
+  wordpress-rocky:
+    build:
+      context: .
+      dockerfile: Dockerfile.rocky
+    container_name: wordpress-rocky
+    hostname: wordpress-rocky
+    privileged: true 
+    ports:
+      - "8082:80"
+      - "2282:22" 
+
+networks:
+  default:
+    driver: bridge
